@@ -14,6 +14,7 @@ import os
 import re
 import sys
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional, List, Dict
 
@@ -564,18 +565,42 @@ def run_enrichment(
             except SpotifyQuotaExhausted as e:
                 wait_match = re.search(r'retry in (\d+)s', str(e))
                 wait_seconds = int(wait_match.group(1)) if wait_match else 60
-                hours = wait_seconds / 3600
-                print(
-                    f"\n{SYMBOLS['quota']} Spotify API rate limited (429).\n"
-                    f"   Spotify Retry-After: {wait_seconds}s (~{hours:.1f} hours).\n"
-                    f"   Agent holding off until reset. Checkpoint at offset {offset} ({processed} processed so far).\n",
-                    flush=True,
-                )
+                hours = wait_seconds // 3600
+                minutes = (wait_seconds % 3600) // 60
+                seconds = wait_seconds % 60
+                
+                reset_time = datetime.now() + timedelta(seconds=wait_seconds + 1)
+                reset_str = reset_time.strftime("%Y-%m-%d %H:%M:%S")
+                
+                print(f"\n{SYMBOLS['quota']} Spotify API rate limited (429)...")
+                print(f"   Spotify Retry-After: {wait_seconds}s (~{hours}h {minutes}m {seconds}s).")
+                print(f"   Agent will resume at {reset_str}")
+                print(f"   Agent holding off until reset. Checkpoint at offset {offset} ({processed} processed so far).")
                 if checkpoint:
                     cp = {"offset": offset, "processed": processed, "errors": errors}
                     _save_checkpoint(cp)
-                _log(f"{SYMBOLS['quota']} Waiting {wait_seconds}s for rate limit to reset...")
-                time.sleep(wait_seconds + 1)
+                
+                last_minute_printed = -1
+                for remaining in range(wait_seconds + 1, 0, -1):
+                    current_minute = (remaining - 1) // 60
+                    
+                    if current_minute != last_minute_printed or remaining <= 60:
+                        mins, secs = divmod(remaining - 1, 60)
+                        hrs, mins = divmod(mins, 60)
+                        time_str = f"{hrs:02d}:{mins:02d}:{secs:02d}"
+                        
+                        bar_len = 20
+                        filled = int(bar_len * (wait_seconds + 1 - remaining) / (wait_seconds + 1))
+                        bar = "█" * filled + "░" * (bar_len - filled)
+                        
+                        _log(
+                            f"{SYMBOLS['quota']} Resuming at {time_str} "
+                            f"|{bar}| {remaining}s remaining"
+                        )
+                        last_minute_printed = current_minute
+                    
+                    time.sleep(1)
+                
                 _log(f"{SYMBOLS['success']} Rate limit reset. Resuming...")
                 continue
             except Exception:
