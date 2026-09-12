@@ -593,14 +593,17 @@ def run_enrichment(
                         filled = int(bar_len * (wait_seconds + 1 - remaining) / (wait_seconds + 1))
                         bar = "█" * filled + "░" * (bar_len - filled)
                         
-                        _log(
-                            f"{SYMBOLS['quota']} Resuming at {time_str} "
-                            f"|{bar}| {remaining}s remaining"
+                        print(
+                            f"\r[spotify_enrich] {SYMBOLS['quota']} "
+                            f"Resuming at {time_str} |{bar}| {remaining}s remaining" + " " * 20,
+                            end="",
+                            flush=True,
                         )
                         last_minute_printed = current_minute
                     
                     time.sleep(1)
                 
+                print()
                 _log(f"{SYMBOLS['success']} Rate limit reset. Resuming...")
                 continue
             except Exception:
