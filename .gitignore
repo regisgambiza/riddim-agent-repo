@@ -1,0 +1,11 @@
+*.db
+*.sqlite
+*.sqlite3
+*.gguf
+__pycache__/
+*.pyc
+*.pyd
+spotify_enrichment_checkpoint.json
+*.db-wal
+*.db-journal
+.env
